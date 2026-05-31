@@ -11,26 +11,19 @@ const path = require('path')
 const { execSync, exec, spawn } = require('child_process')
 const os = require('os')
 
-// ─────────────────────────────────────────
-//  KONFIGURASI
-// ─────────────────────────────────────────
 const OWNER_NUMBER = '6283874132036'
 const DB_DIR = path.join(__dirname, 'db')
 const DB_AFK    = path.join(DB_DIR, 'afk.json')
 const DB_WHITE  = path.join(DB_DIR, 'whitelist.json')
 const DB_SPAM   = path.join(DB_DIR, 'spam.json')
 
-const SPAM_LIMIT  = 5        // maks pesan sebelum block
-const SPAM_WINDOW = 10000    // 10 detik
-const TEMP_MUTE_DURATION = 300 // 5 menit (detik)
+const SPAM_LIMIT  = 5
+const SPAM_WINDOW = 10000
+const TEMP_MUTE_DURATION = 300
 
-// Delay range biar keliatan natural (ms)
 const REPLY_DELAY_MIN = 1200
 const REPLY_DELAY_MAX = 3500
 
-// ─────────────────────────────────────────
-//  INIT DB
-// ─────────────────────────────────────────
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
 
 function loadDB(p, def = {}) {
@@ -44,43 +37,31 @@ function saveDB(p, data) {
     try { fs.writeFileSync(p, JSON.stringify(data, null, 2)) } catch (_) {}
 }
 
-// State
-let afkData    = loadDB(DB_AFK, {})    // { jid: { reason, since } }
-let whitelist  = loadDB(DB_WHITE, [])  // [ jid, ... ]
-let spamTrack  = loadDB(DB_SPAM, {})   // { jid: { count, lastTime } }
-let tempMute   = {}                    // { jid: unmuteTimestamp }
-let afkReplied = {}                    // { jid: lastReplyTimestamp } cooldown AFK reply
-const AFK_REPLY_COOLDOWN = 3 * 60 * 1000 // 3 menit per chat
-
-// Persistent flag biar gak minta pairing ulang saat reconnect
+let afkData    = loadDB(DB_AFK, {})   
+let whitelist  = loadDB(DB_WHITE, [])  
+let spamTrack  = loadDB(DB_SPAM, {})  
+let tempMute   = {}                  
+let afkReplied = {}        
+const AFK_REPLY_COOLDOWN = 3 * 60 * 1000 
 let pairingRequested = false
 
-// ─────────────────────────────────────────
-//  HELPER
-// ─────────────────────────────────────────
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 const question = (text) => new Promise(resolve => rl.question(text, resolve))
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-// Random delay biar keliatan kayak manusia ngetik
 function humanDelay(min = REPLY_DELAY_MIN, max = REPLY_DELAY_MAX) {
     const ms = Math.floor(Math.random() * (max - min + 1)) + min
     return delay(ms)
 }
 
-// Kirim pesan dengan simulasi "sedang mengetik..." + jeda natural
 async function sendHuman(sock, jid, content, options = {}) {
     try {
-        // Kirim status "typing"
         await sock.sendPresenceUpdate('composing', jid)
-        // Jeda sesuai panjang pesan (makin panjang makin lama)
         const text = typeof content === 'string' ? content : content.text || ''
         const typingTime = Math.min(Math.max(text.length * 30, REPLY_DELAY_MIN), REPLY_DELAY_MAX)
         await delay(typingTime)
-        // Stop typing
         await sock.sendPresenceUpdate('paused', jid)
         await delay(300)
-        // Kirim pesan
         return await sock.sendMessage(jid, typeof content === 'string' ? { text: content } : content, options)
     } catch (_) {
         return await sock.sendMessage(jid, typeof content === 'string' ? { text: content } : content, options)
@@ -167,7 +148,6 @@ async function startBot() {
 
     sock.ev.on('creds.update', saveCreds)
 
-    // ── CONNECTION HANDLER ──
     sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
         if (connection === 'open') {
             console.log('✅ AKASHA WA USERBOT - CONNECTED!')
@@ -237,7 +217,6 @@ async function startBot() {
                     await sendHuman(sock, jid, `I'M BACK NlGGA!!\n⏳ _(Kembali setelah ${dur} AFK - Alasan: ${reason})_`)
                 }
 
-                // Reset spam counter kalau owner balas PM
                 if (isPrivate && !tl.startsWith('.')) {
                     const chatJid = normalizeJid(jid)
                     if (spamTrack[chatJid]) {
@@ -323,7 +302,6 @@ async function startBot() {
                 continue // skip incoming handler untuk pesan owner
             }
 
-            // ── HANDLER PESAN MASUK ──
             if (!isOwner) {
                 const senderKey = normalizeJid(senderJid)
                 const isWhitelisted = whitelist.includes(senderKey)

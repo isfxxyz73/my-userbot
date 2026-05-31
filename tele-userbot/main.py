@@ -6,24 +6,20 @@ import warnings
 import time 
 from datetime import datetime
 
-# Bungkam DeprecationWarning dari library speedtest biar log bersih
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 load_dotenv()
 
-# --- [ KONFIGURASI ] ---
 api_id = int(os.getenv('api_id'))
 api_hash = os.getenv('api_hash')
 client = TelegramClient('sesi_userbot', api_id, api_hash)
 
-# --- [ PATHS ] ---
 IMAGE_INFO = "image_banner.png"
 DB_AUTH = "authorized_users.json"
 DB_AFK = "afk_logs.json"
 DB_WHITE = "pm_whitelist.json"
 DB_SPAM = "spam_tracker.json"
 
-# --- [ TRACKER MUTE ] ---
 TEMP_MUTE = {}
 
 def load_db(p, s=True):
@@ -41,7 +37,6 @@ def save_db(p, d):
             json.dump(list(d) if isinstance(d, set) else d, f)
     except: pass
 
-# --- [ FUNGSI PENGHITUNG WAKTU AFK ] ---
 def get_afk_time(since):
     diff = int(time.time() - since)
     if diff < 60: return f"{diff} detik"
@@ -122,7 +117,6 @@ async def handler_incoming(event):
 
     if mid_s in afk_data and not (sid == me.id):
         reason = afk_data[mid_s].get('reason', 'YNDTKTS')
-        # Ambil waktu AFK dan ubah ke format yang bisa dibaca
         since_time = afk_data[mid_s].get('since', time.time())
         afk_duration = get_afk_time(since_time)
         
@@ -163,20 +157,19 @@ async def handler_outgoing(event):
             spam_tracker[str(event.chat_id)] = 0; save_db(DB_SPAM, spam_tracker)
 
     if mid_s in afk_data and not t_l.startswith(".afk"):
-        # Ambil data sebelum dihapus
+       
         reason = afk_data[mid_s].get('reason', 'YNDTKTS')
         since_time = afk_data[mid_s].get('since', time.time())
         afk_duration = get_afk_time(since_time)
         
-        # Hapus status AFK
         del afk_data[mid_s]
         save_db(DB_AFK, afk_data)
         
-        # Kirim pesan comeback
+       
         await event.respond(f"💋 **Muach gwejh back ygy!**\n⏳ `(Kembali setelah {afk_duration} AFK - Alasan: {reason})`")
     if t_l.startswith(".afk"):
         r = txt[5:].strip()
-        # Catat waktu saat lu nge-AFK
+       
         afk_data[mid_s] = {'reason': r if r else "YNDTKTS", 'since': time.time()} 
         save_db(DB_AFK, afk_data)
         await event.edit(f"💤 **BYE gaiss AFK duluuu alasan : {afk_data[mid_s]['reason']}**")
