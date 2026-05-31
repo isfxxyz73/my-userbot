@@ -295,7 +295,7 @@ async function startBot() {
                 } else if (tl === '.info') {
                     await sendHuman(sock, jid, '_Fetching info..._ ⏳')
                     const info = getSystemInfo()
-                    const bannerPath = '/home/fxxx98/wa-userbot/image_banner.png'
+                    const bannerPath = 'image_banner.png'
                     if (fs.existsSync(bannerPath)) {
                         await sock.sendMessage(jid, {
                             image: fs.readFileSync(bannerPath),

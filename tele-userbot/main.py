@@ -1,5 +1,6 @@
 from telethon import TelegramClient, events, functions, Button
 from telethon.tl import types
+from dotenv import load_dotenv
 import psutil, platform, os, sys, subprocess, asyncio, re, json, requests
 import warnings 
 import time 
@@ -8,17 +9,19 @@ from datetime import datetime
 # Bungkam DeprecationWarning dari library speedtest biar log bersih
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+load_dotenv()
+
 # --- [ KONFIGURASI ] ---
-api_id = 37157919
-api_hash = 'e6712f0d02d472dbeaa4ec8fae26eacb'
+api_id = int(os.getenv('api_id'))
+api_hash = os.getenv('api_hash')
 client = TelegramClient('sesi_userbot', api_id, api_hash)
 
 # --- [ PATHS ] ---
-IMAGE_INFO = "/home/fxxx98/bot_tele/i.jpeg"
-DB_AUTH = "/home/fxxx98/bot_tele/authorized_users.json"
-DB_AFK = "/home/fxxx98/bot_tele/afk_logs.json"
-DB_WHITE = "/home/fxxx98/bot_tele/pm_whitelist.json"
-DB_SPAM = "/home/fxxx98/bot_tele/spam_tracker.json"
+IMAGE_INFO = "image_banner.png"
+DB_AUTH = "authorized_users.json"
+DB_AFK = "afk_logs.json"
+DB_WHITE = "pm_whitelist.json"
+DB_SPAM = "spam_tracker.json"
 
 # --- [ TRACKER MUTE ] ---
 TEMP_MUTE = {}
@@ -181,7 +184,7 @@ async def handler_outgoing(event):
         start = datetime.now(); await event.edit("`Pinging...` ")
         await event.edit(f"**Pong !!**\n🚀 `Latency: {(datetime.now()-start).total_seconds()*1000:.2f} ms` ")
     elif t_l == ".info":
-        await event.edit("`Sekk...` "); res = await get_stats_text(me.first_name)
+        await event.edit("`Wait ygy ...` "); res = await get_stats_text(me.first_name)
         if os.path.exists(IMAGE_INFO): await client.send_file(event.chat_id, IMAGE_INFO, caption=res); await event.delete()
         else: await event.edit(res)
     elif t_l == ".speedtest":
