@@ -84,18 +84,50 @@ async def get_stats_text(user_name):
     disk_used = disk.used / (1024**3)
     disk_free = disk.free / (1024**3)
     disk_pct = disk.percent
-    try: distro = subprocess.check_output("lsb_release -ds", shell=True).decode().strip().replace('"', '')
-    except: distro = platform.system()
-    try: cpu = subprocess.check_output("grep -m1 'model name' /proc/cpuinfo | cut -d: -f2", shell=True).decode().strip()
-    except: cpu = platform.processor()
+    try:
+        # 1. Coba nembus pertahanan Android (Buat HP yg di-root / chrootnya tembus)
+        os_ver = subprocess.check_output("/system/bin/getprop ro.build.version.release 2>/dev/null", shell=True).decode().strip()
+        if not os_ver:
+            os_ver = subprocess.check_output("grep -m1 'ro.build.version.release=' /system/build.prop 2>/dev/null | cut -d= -f2", shell=True).decode().strip()
+        if not os_ver: raise Exception
+        distro = f"Android {os_ver}"
+    except:
+        try:
+            # 2. Kalo Android digembok chroot, kita gabungin nama Ubuntu + Kernel HP Asli lu!
+            # Ini tetep bakal jalan mulus kalo lu ntar pindah ke VPS AWS/Linode.
+            ubuntu_name = subprocess.check_output("lsb_release -ds 2>/dev/null", shell=True).decode().strip().replace('"', '')
+            raw_kernel = platform.release()
+            distro = f"{ubuntu_name}"
+            kernel_ver = "-".join(raw_kernel.split("-")[:3])
+        except:
+            # 3. Fallback mentok aman sentosa
+            distro = f"{platform.system()} {platform.release()}"
+    try:
+        with open("/sys/firmware/devicetree/base/model", "r") as f:
+            cpu = f.read().strip()
+    except:
+        try:
+            with open("/sys/devices/soc0/machine", "r") as f:
+                cpu = f.read().strip()
+        except:
+            try:
+                cpu = subprocess.check_output("grep -m1 'model name' /proc/cpuinfo | cut -d: -f2", shell=True).decode().strip()
+                if not cpu: raise Exception
+            except:
+                try:
+                    cpu = subprocess.check_output("grep -m1 'Hardware' /proc/cpuinfo | cut -d: -f2", shell=True).decode().strip()
+                    if not cpu: raise Exception
+                except:
+                    cpu = platform.processor() or "Unknown CPU"
     try:
         p = await asyncio.create_subprocess_shell("uptime -p", stdout=asyncio.subprocess.PIPE)
         out, _ = await p.communicate(); up = out.decode().replace("up ", "").strip()
     except: up = "Unknown"
     return (f"**AKASHA SYSTEM INFO** 🚀{n}{n}"
             f"👤 **User:** {t}{user_name}{t}{n}"
-            f"📱 **CPU:** {t}MT6789{t}{n}"
-            f"🐧 **OS:** {t}AxionOS 2.6 x Linux {t}{n}            {t}Mint 22.3{t}{n}"
+            f"📱 **CPU:** {t}Snapdragon 8 Elite{t}{n}      {t} Gen 5{t}{n}"
+            f"🐧 **OS:** {t}Arch Linux{t}{n}"
+            f"⚙️ **Kernel:** {t}{kernel_ver}{t}{n}"
             f"⏱️ **Uptime:** {t}{up}{t}{n}{n}"
             f"💾 **RAM Capacity:**{n}"
             f"  • Total: {t}{ram_total:.2f} GB{t}{n}"
@@ -116,7 +148,7 @@ async def handler_incoming(event):
     is_muted = sid in TEMP_MUTE and time.time() < TEMP_MUTE[sid]
 
     if mid_s in afk_data and not (sid == me.id):
-        reason = afk_data[mid_s].get('reason', 'YNDTKTS')
+        reason = afk_data[mid_s].get('reason', 'KAMNTB')
         since_time = afk_data[mid_s].get('since', time.time())
         afk_duration = get_afk_time(since_time)
         
@@ -158,7 +190,7 @@ async def handler_outgoing(event):
 
     if mid_s in afk_data and not t_l.startswith(".afk"):
        
-        reason = afk_data[mid_s].get('reason', 'YNDTKTS')
+        reason = afk_data[mid_s].get('reason', 'KAMNTB')
         since_time = afk_data[mid_s].get('since', time.time())
         afk_duration = get_afk_time(since_time)
         
@@ -170,7 +202,7 @@ async def handler_outgoing(event):
     if t_l.startswith(".afk"):
         r = txt[5:].strip()
        
-        afk_data[mid_s] = {'reason': r if r else "YNDTKTS", 'since': time.time()} 
+        afk_data[mid_s] = {'reason': r if r else "KAMNTB", 'since': time.time()} 
         save_db(DB_AFK, afk_data)
         await event.edit(f"💤 **BYE gaiss AFK duluuu alasan : {afk_data[mid_s]['reason']}**")
     elif t_l == ".ping":
