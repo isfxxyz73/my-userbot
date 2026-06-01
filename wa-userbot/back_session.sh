@@ -1,1 +1,1 @@
-tmux attach -t userbot_wa
+tmux attach -t wa

@@ -1,1 +1,1 @@
-tmux attach -t userbot_tele
+tmux attach -t tele
