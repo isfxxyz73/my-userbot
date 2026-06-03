@@ -11,7 +11,8 @@ const path = require('path')
 const { execSync, exec, spawn } = require('child_process')
 const os = require('os')
 
-const OWNER_NUMBER = '6283874132036'
+require('dotenv').config();
+const OWNER_NUMBER = process.env.NO_WA;
 const DB_DIR = path.join(__dirname, 'db')
 const DB_AFK    = path.join(DB_DIR, 'afk.json')
 const DB_WHITE  = path.join(DB_DIR, 'whitelist.json')

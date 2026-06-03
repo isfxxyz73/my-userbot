@@ -51,7 +51,7 @@ auth_u = load_db(DB_AUTH); whitelist_pm = load_db(DB_WHITE)
 afk_data = load_db(DB_AFK, False); spam_tracker = load_db(DB_SPAM, False)
 
 HELP_TEXT = """
-**DAFTAR COMMAND WAHYU BOT** 🚀
+**DAFTAR COMMAND AKASHA SYSTEM** 🚀
 
 **OWNER COMMANDS:**
 • `.info` - Cek spek VPS & Detail Storage
@@ -62,14 +62,11 @@ HELP_TEXT = """
 • `.perm` - Atur izin fitur user (Menu)
 • `.list` - Cek daftar user & izin
 • `.restart` - Muat ulang bot
-
-**SUBUSER & OWNER COMMANDS:**
-• `.ping` - Cek latency bot
-• `.aigm <tanya>` - Tanya Gemini AI
-• `.aigr <tanya>` - Tanya Groq AI
-• `.setstyle <gaya>` - Ubah gaya bahasa AI
-• `.statusai` - Cek gaya AI aktif
 • `.help` - Munculin menu ini
+• `.ban` - Ban member
+• `.unban` - Unban member
+• `.pin` - Pin sebuah pesan
+• `.unpin` - Unpin sebuah pesan
 """
 
 async def get_stats_text(user_name):
@@ -227,9 +224,147 @@ async def handler_outgoing(event):
             await event.edit(f"✅ User `{tid}` Whitelisted PM!")
         except: await event.edit("❌ Gagal.")
     elif t_l == ".list":
-        msg = "**📜 DAFTAR IZIN AKTIF**\n\n**Whitelist PM:** " + (", ".join([f"`{u}`" for u in whitelist_pm]) or "-") 
-        await event.edit(msg) 
+        msg = "**📜 DAFTAR IZIN AKTIF**\n\n**Whitelist PM:** " + (", ".join([f"`{u}`" for u in whitelist_pm]) or "-")
+        await event.edit(msg)
     elif t_l == ".help": await event.edit(HELP_TEXT)
+    elif t_l.startswith(".ban"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        user = int(target) if str(target).isdigit() else target
+        if user:
+            try:
+                await client.edit_permissions(event.chat_id, user, view_messages=False)
+                await event.edit(f"🔨 **Berhasil nge-ban {user}!** Mampus lu dikeluarin.")
+            except Exception as e: await event.edit(f"❌ **Gagal nge-ban:** `{e}`")
+        else: await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l.startswith(".kick"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        user = int(target) if str(target).isdigit() else target
+        if user:
+            try:
+                await client.kick_participant(event.chat_id, user)
+                await event.edit(f"🥾 **Berhasil nge-kick {user}!** Hush sana main jauh-jauh.")
+            except Exception as e: await event.edit(f"❌ **Gagal nge-kick:** `{e}`")
+        else: await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l.startswith(".unban"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        user = int(target) if str(target).isdigit() else target
+        if user:
+            try:
+                await client.edit_permissions(event.chat_id, user, view_messages=True)
+                await event.edit(f"🕊️ **Berhasil unban {user}!** Bebas dari penjara grup.")
+            except Exception as e: await event.edit(f"❌ **Gagal unban:** `{e}`")
+        else: await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l.startswith(".pin"):
+        args = event.raw_text.split(" ", 1)
+        try:
+            if event.is_reply:
+                rep = await event.get_reply_message()
+                await client.pin_message(event.chat_id, rep.id, notify=True)
+                await event.edit("📌 **Pinned!**")
+            elif len(args) > 1:
+                teks_baru = args[1]
+                msg = await event.edit(teks_baru)
+                await client.pin_message(event.chat_id, msg.id, notify=True)
+            else:
+                await event.edit("❌ **Reply pesan yang mau di-pin, atau ketik `.pin <teks>` Ngab!**")
+        except Exception as e: 
+            await event.edit(f"❌ **Gagal nge-pin:** `{e}`")
+    elif t_l.startswith(".promote"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        user = int(target) if str(target).isdigit() else target
+        if user:
+            try:
+                await client.edit_admin(
+                    event.chat_id, user, 
+                    change_info=True, delete_messages=True, ban_users=True, 
+                    invite_users=True, pin_messages=True, manage_call=True, title="Admin"
+                )
+                await event.edit(f"👑 **{user} sekarang dapet pangkat Admin!**")
+            except Exception as e: await event.edit(f"❌ **Gagal promote:** `{e}`")
+        else: await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l.startswith(".demote"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        user = int(target) if str(target).isdigit() else target
+        if user:
+            try:
+                await client.edit_admin(
+                    event.chat_id, user, 
+                    change_info=False, delete_messages=False, ban_users=False, 
+                    invite_users=False, pin_messages=False, manage_call=False
+                )
+                await event.edit(f"📉 **Pangkat {user} berhasil dicabut!** Balik jadi kroco.")
+            except Exception as e: await event.edit(f"❌ **Gagal demote:** `{e}`")
+        else: await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l == ".unpin":
+        try:
+            if event.is_reply:
+                rep = await event.get_reply_message()
+                await client.unpin_message(event.chat_id, rep.id)
+                await event.edit("📌 **Pesan yang di-reply berhasil di-unpin!** Copot dah tuh.")
+            else:
+                await client.unpin_message(event.chat_id)
+                await event.edit("📌 **Pesan sematan terakhir berhasil di-unpin!**")
+        except Exception as e: 
+            await event.edit(f"❌ **Gagal nge-unpin:** `{e}`")
+    elif t_l.startswith(".add"):
+        target = (await event.get_reply_message()).sender_id if event.is_reply else (txt.split()[1] if len(txt.split()) > 1 else None)
+        if target:
+            try:
+                await event.edit("⏳ `Mencoba menyeret target...`")
+                user_ent = await client.get_input_entity(target)
+                await client(functions.channels.InviteToChannelRequest(
+                    channel=event.chat_id,
+                    users=[user_ent]
+                ))
+                await event.edit(f"➕ **Berhasil nyeret target ke dalem grup!** Welcome Ngab.")
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "privacy" in error_msg or "mutual contact" in error_msg:
+                    await event.edit("❌ **Gagal nyeret:** Target masang tameng privasi Ngab! (Cuma mutual kontak yang bisa nge-add).")
+                else:
+                    try:
+                        await client(functions.messages.AddChatUserRequest(
+                            chat_id=event.chat_id,
+                            user_id=user_ent,
+                            fwd_limit=0
+                        ))
+                        await event.edit(f"➕ **Berhasil nyeret target ke grup basic!**")
+                    except Exception as ex:
+                        await event.edit(f"❌ **Gagal:** `{ex}`")
+        else: 
+            await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+    elif t_l.startswith(".promote"):
+        try:
+            parts = event.raw_text.split(maxsplit=1)
+            target = None
+            custom_title = "Admin" # Gelar default kalo lu males ngetik
+            if event.is_reply:
+                target = (await event.get_reply_message()).sender_id
+                if len(parts) > 1:
+                    custom_title = parts[1]
+            else:
+                if len(parts) > 1:
+                    sub_parts = parts[1].split(maxsplit=1)
+                    target = sub_parts[0] 
+                    target = int(target) if str(target).lstrip('-').isdigit() else target
+                    
+                    if len(sub_parts) > 1:
+                        custom_title = sub_parts[1] 
+            if target:
+                custom_title = custom_title[:16]
+                
+                await client.edit_admin(
+                    event.chat_id, target, 
+                    change_info=True, delete_messages=True, ban_users=True, 
+                    invite_users=True, pin_messages=True, manage_call=True, 
+                    title=custom_title
+                )
+                await event.edit(f"👑 **Berhasil promote!** Target dapet pangkat dengan gelar: `{custom_title}`")
+            else:
+                await event.edit("❌ **Reply chat atau tag username/ID orangnya Ngab!**")
+                
+        except Exception as e: 
+            await event.edit(f"❌ **Gagal promote:** `{e}`")
     elif t_l == ".restart":
         for i in range(3, 0, -1): await event.edit(f"`♻️ Restarting in {i}s...` "); await asyncio.sleep(1)
         await event.edit("`♻️ Restarting now...` "); await client.disconnect()
