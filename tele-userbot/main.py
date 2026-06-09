@@ -195,7 +195,7 @@ async def handler_outgoing(event):
         save_db(DB_AFK, afk_data)
         
        
-        await event.respond(f"💋 **Muach gwejh back ygy!**\n⏳ `(Kembali setelah {afk_duration} AFK - Alasan: {reason})`")
+        await event.respond(f" **I'M BACK N1GGA!'**\n⏳ `(Kembali setelah {afk_duration} AFK - Alasan: {reason})`")
     if t_l.startswith(".afk"):
         r = txt[5:].strip()
        
