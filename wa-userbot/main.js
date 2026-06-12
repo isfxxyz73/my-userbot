@@ -11,8 +11,9 @@ const path = require('path')
 const { execSync, exec, spawn } = require('child_process')
 const os = require('os')
 
-require('dotenv').config();
-const OWNER_NUMBER = process.env.NO_WA;
+require('dotenv').config()
+// Pastikan NO_WA diisi dengan format 628xxxxxxxxxx di file .env
+const OWNER_NUMBER = process.env.NO_WA || ''
 const DB_DIR = path.join(__dirname, 'db')
 const DB_AFK    = path.join(DB_DIR, 'afk.json')
 const DB_WHITE  = path.join(DB_DIR, 'whitelist.json')
@@ -43,8 +44,11 @@ let whitelist  = loadDB(DB_WHITE, [])
 let spamTrack  = loadDB(DB_SPAM, {})  
 let tempMute   = {}                  
 let afkReplied = {}        
-const AFK_REPLY_COOLDOWN = 3 * 60 * 1000 
+const AFK_REPLY_COOLDOWN = 3 * 60 * 1000 // 3 menit
 let pairingRequested = false
+
+// Map untuk melacak pesan yang dikirim oleh bot sendiri agar tidak memicu Auto-UnAFK
+const botSentMessages = new Map()
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 const question = (text) => new Promise(resolve => rl.question(text, resolve))
@@ -58,13 +62,23 @@ function humanDelay(min = REPLY_DELAY_MIN, max = REPLY_DELAY_MAX) {
 async function sendHuman(sock, jid, content, options = {}) {
     try {
         await sock.sendPresenceUpdate('composing', jid)
-        const text = typeof content === 'string' ? content : content.text || ''
+        const text = typeof content === 'string' ? content : content.text || content.caption || ''
         const typingTime = Math.min(Math.max(text.length * 30, REPLY_DELAY_MIN), REPLY_DELAY_MAX)
         await delay(typingTime)
         await sock.sendPresenceUpdate('paused', jid)
         await delay(300)
+
+        // Catat pesan yang dikirim oleh bot sendiri agar tidak memicu fromMe (Auto-UnAFK)
+        if (text) {
+            botSentMessages.set(text.trim(), Date.now())
+        }
+
         return await sock.sendMessage(jid, typeof content === 'string' ? { text: content } : content, options)
     } catch (_) {
+        const text = typeof content === 'string' ? content : content.text || content.caption || ''
+        if (text) {
+            botSentMessages.set(text.trim(), Date.now())
+        }
         return await sock.sendMessage(jid, typeof content === 'string' ? { text: content } : content, options)
     }
 }
@@ -205,17 +219,32 @@ async function startBot() {
             const tl = text.toLowerCase()
             const now = Date.now()
 
+            // Bersihkan botSentMessages yang sudah lebih dari 60 detik (memory management)
+            for (const [msgText, timestamp] of botSentMessages.entries()) {
+                if (now - timestamp > 60000) {
+                    botSentMessages.delete(msgText)
+                }
+            }
+
+            // Jika pesan ini adalah pesan balasan yang baru dikirim oleh bot sendiri, abaikan
+            if (fromMe && botSentMessages.has(text)) {
+                return
+            }
+
             // ── HANDLER PESAN KELUAR (OWNER COMMANDS) ──
             if (fromMe) {
-                // Auto unafk kalau owner ngetik apapun selain .afk
+                // Auto unafk kalau owner ngetik apapun selain .afk dan selain auto-reply bot
                 const ownerKey = ownerJid
                 if (afkData[ownerKey] && !tl.startsWith('.afk')) {
-                    const { reason, since } = afkData[ownerKey]
-                    const dur = getAfkDuration(since)
-                    delete afkData[ownerKey]
-                    afkReplied = {}
-                    saveDB(DB_AFK, afkData)
-                    await sendHuman(sock, jid, `I'M BACK NlGGA!!\n⏳ _(Kembali setelah ${dur} AFK - Alasan: ${reason})_`)
+                    // Proteksi ganda: pastikan bukan teks auto-reply dari bot
+                    if (!tl.startsWith('💤') && !tl.startsWith('🙏') && !tl.startsWith("i'm back")) {
+                        const { reason, since } = afkData[ownerKey]
+                        const dur = getAfkDuration(since)
+                        delete afkData[ownerKey]
+                        afkReplied = {}
+                        saveDB(DB_AFK, afkData)
+                        await sendHuman(sock, jid, `I'M BACK NlGGA!!\n⏳ _(Kembali setelah ${dur} AFK - Alasan: ${reason})_`)
+                    }
                 }
 
                 if (isPrivate && !tl.startsWith('.')) {
@@ -277,6 +306,7 @@ async function startBot() {
                     const info = getSystemInfo()
                     const bannerPath = 'image_banner.png'
                     if (fs.existsSync(bannerPath)) {
+                        botSentMessages.set(info.trim(), Date.now())
                         await sock.sendMessage(jid, {
                             image: fs.readFileSync(bannerPath),
                             caption: info
@@ -341,10 +371,19 @@ async function startBot() {
 
                     if (isPrivate) {
                         if (isWhitelisted) {
-                            await sendHuman(sock, jid, `💤 *Bentar yaa lagi AFK!*\nAlasan: ${reason}\n⏳ _(Sejak ${dur} yang lalu)_`, { quoted: msg })
+                            const replyKey = senderKey
+                            if (now - (afkReplied[replyKey] || 0) >= AFK_REPLY_COOLDOWN) {
+                                afkReplied[replyKey] = now
+                                await sendHuman(sock, jid, `💤 *Bentar yaa lagi AFK!*\nAlasan: ${reason}\n⏳ _(Sejak ${dur} yang lalu)_`, { quoted: msg })
+                            }
                         } else if (!isMuted) {
-                            const count = spamTrack[senderKey]?.count || 1
-                            await sendHuman(sock, jid, `🙏 *PM belum di-approve, jangan spam atau di-block!*\n⏳ *AFK: ${reason}* _(Sejak ${dur} yang lalu)_ *(${count}/${SPAM_LIMIT})*`, { quoted: msg })
+                            // Beri peringatan PM belum di-approve dengan jeda 30 detik agar tidak flood
+                            const replyKey = senderKey
+                            if (now - (afkReplied[replyKey] || 0) >= 30000) {
+                                afkReplied[replyKey] = now
+                                const count = spamTrack[senderKey]?.count || 1
+                                await sendHuman(sock, jid, `🙏 *PM belum di-approve, jangan spam atau di-block!*\n⏳ *AFK: ${reason}* _(Sejak ${dur} yang lalu)_ *(${count}/${SPAM_LIMIT})*`, { quoted: msg })
+                            }
                         }
                     } else if (isGroup) {
                         const isMention = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(ownerJid)
@@ -352,7 +391,11 @@ async function startBot() {
                         const isReplyToOwner = replyTo && normalizeJid(replyTo) === ownerJid
 
                         if (isMention || isReplyToOwner) {
-                            await sendHuman(sock, jid, `💤 *Bentar yaa lagi AFK!*\nAlasan: ${reason}\n⏳ _(Sejak ${dur} yang lalu)_`, { quoted: msg })
+                            const replyKey = `${jid}_${senderKey}`
+                            if (now - (afkReplied[replyKey] || 0) >= AFK_REPLY_COOLDOWN) {
+                                afkReplied[replyKey] = now
+                                await sendHuman(sock, jid, `💤 *Bentar yaa lagi AFK!*\nAlasan: ${reason}\n⏳ _(Sejak ${dur} yang lalu)_`, { quoted: msg })
+                            }
                         }
                     }
                 } else if (isPrivate && !isWhitelisted && !isMuted) {
