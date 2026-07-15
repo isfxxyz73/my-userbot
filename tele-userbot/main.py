@@ -37,6 +37,12 @@ def save_db(p, d):
             json.dump(list(d) if isinstance(d, set) else d, f)
     except: pass
 
+AVAILABLE_ASCII_FONTS = [
+    "banner", "standard", "big", "slant", "small",
+    "3-d", "block", "dotmatrix", "digital", "lean",
+    "mini", "script", "letters"
+]
+
 def get_afk_time(since):
     diff = int(time.time() - since)
     if diff < 60: return f"{diff} detik"
@@ -47,6 +53,22 @@ def get_afk_time(since):
     d = h // 24; h = h % 24
     return f"{d} hari {h} jam"
 
+def text_to_ascii_art(text, font="banner"):
+    text = text.strip()
+    if not text:
+        return "❌ Masukkan teks yang ingin diubah."
+    try:
+        import pyfiglet
+        figlet = pyfiglet.Figlet(font=font)
+        return figlet.renderText(text)
+    except ModuleNotFoundError:
+        if font != "banner":
+            return ("❌ Modul pyfiglet belum terpasang sehingga font tidak bisa dipilih.\n"
+                    "Install dengan `pip install pyfiglet` lalu coba lagi.")
+        return "\n".join(ch * 2 for ch in text.upper())
+    except Exception as e:
+        return f"❌ Gagal membuat ASCII art: {e}"
+
 auth_u = load_db(DB_AUTH); whitelist_pm = load_db(DB_WHITE)
 afk_data = load_db(DB_AFK, False); spam_tracker = load_db(DB_SPAM, False)
 
@@ -56,6 +78,7 @@ HELP_TEXT = """
 **OWNER COMMANDS:**
 • `.info` - Cek spek VPS & Detail Storage
 • `.speedtest` - Tes kecepatan internet VPS (MB/s)
+• `.ascii [font] <teks>` - Ubah teks jadi ASCII art dengan font pilihan
 • `.afk <alasan>` - Mode AFK
 • `.approve` - Whitelist PM (Reply/ID)
 • `.permgroup` - Atur izin fitur untuk satu grup
@@ -122,8 +145,8 @@ async def get_stats_text(user_name):
     except: up = "Unknown"
     return (f"**AKASHA SYSTEM INFO** 🚀{n}{n}"
             f"👤 **User:** {t}{user_name}{t}{n}"
-            f"📱 **CPU:** {t}Snapdragon 8 Elite{t}{n}      {t} Gen 5{t}{n}"
-            f"🐧 **OS:** {t}Arch Linux{t}{n}"
+            f"📱 **CPU:** {t}Ambatek helio gay67{t}{n}      {t} Gen 5{t}{n}"
+            f"🐧 **OS:** {t}Sigeon PEX OS{t}{n}"
             f"⚙️ **Kernel:** {t}{kernel_ver}{t}{n}"
             f"⏱️ **Uptime:** {t}{up}{t}{n}{n}"
             f"💾 **RAM Capacity:**{n}"
@@ -215,6 +238,22 @@ async def handler_outgoing(event):
             res = subprocess.check_output([sys.executable, "-m", "speedtest", "--simple", "--bytes", "--secure"]).decode("utf-8")
             await event.edit(f"**🚀 Speedtest Results (MB/s):**\n```{res}```")
         except Exception as e: await event.edit(f"❌ Speedtest Error: `{str(e)}`")
+    elif t_l.startswith(".ascii"):
+        raw = txt[len(".ascii"):].strip()
+        if not raw:
+            await event.edit("❌ Format: `.ascii [font] <teks>`\nContoh: `.ascii slant Hello World`")
+        else:
+            parts = raw.split(None, 1)
+            font = "banner"
+            text = raw
+            if parts[0].lower() in AVAILABLE_ASCII_FONTS and len(parts) > 1:
+                font = parts[0].lower()
+                text = parts[1]
+            elif parts[0].lower().startswith("font="):
+                font = parts[0].split("=", 1)[1]
+                text = parts[1] if len(parts) > 1 else ""
+            art = text_to_ascii_art(text, font)
+            await event.edit(f"```\n{art}\n```")
     elif t_l.startswith(".approve"):
         try:
             tid = (await event.get_reply_message()).sender_id if event.is_reply else int(txt.split(" ", 1)[1])
