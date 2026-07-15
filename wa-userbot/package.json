@@ -10,7 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc13",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "speedtest-cli": "^0.1.0"
   },
   "description": ""
 }

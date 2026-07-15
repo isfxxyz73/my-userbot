@@ -137,6 +137,67 @@ function getSystemInfo() {
     )
 }
 
+function formatMbps(value) {
+    return `${Number(value).toFixed(2)} Mbps`
+}
+
+function parseSpeedtestResult(raw) {
+    const data = JSON.parse(raw)
+
+    if (data.download?.bandwidth || data.upload?.bandwidth) {
+        const download = ((data.download?.bandwidth || 0) * 8) / 1000000
+        const upload = ((data.upload?.bandwidth || 0) * 8) / 1000000
+        const ping = data.ping?.latency ?? 0
+        const server = data.server?.name || data.server?.location || 'Unknown'
+        const isp = data.isp || 'Unknown'
+
+        return `*SPEEDTEST RESULT*\n\n` +
+            `Download: \`${formatMbps(download)}\`\n` +
+            `Upload: \`${formatMbps(upload)}\`\n` +
+            `Ping: \`${Number(ping).toFixed(2)} ms\`\n` +
+            `Server: \`${server}\`\n` +
+            `ISP: \`${isp}\``
+    }
+
+    const download = (data.download || 0) / 1000000
+    const upload = (data.upload || 0) / 1000000
+    const ping = data.ping || 0
+    const server = data.server?.name || data.server?.sponsor || 'Unknown'
+    const isp = data.client?.isp || 'Unknown'
+
+    return `*SPEEDTEST RESULT*\n\n` +
+        `Download: \`${formatMbps(download)}\`\n` +
+        `Upload: \`${formatMbps(upload)}\`\n` +
+        `Ping: \`${Number(ping).toFixed(2)} ms\`\n` +
+        `Server: \`${server}\`\n` +
+        `ISP: \`${isp}\``
+}
+
+function runSpeedtestCommand(command) {
+    return new Promise((resolve, reject) => {
+        exec(command, { timeout: 120000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+            if (error) return reject(new Error(stderr || error.message))
+            resolve(stdout)
+        })
+    })
+}
+
+async function getSpeedtestInfo() {
+    const commands = [
+        'speedtest --accept-license --accept-gdpr -f json',
+        'speedtest-cli --json'
+    ]
+
+    for (const command of commands) {
+        try {
+            const raw = await runSpeedtestCommand(command)
+            return parseSpeedtestResult(raw)
+        } catch (_) {}
+    }
+
+    return 'Speedtest belum tersedia di VPS. Install salah satu: `speedtest` atau `speedtest-cli`.'
+}
+
 const HELP_TEXT = `🚀 *AKASHA USERBOT - WA EDITION*
 
 *OWNER COMMANDS:*
@@ -146,6 +207,7 @@ const HELP_TEXT = `🚀 *AKASHA USERBOT - WA EDITION*
 • \`.unapprove <nomor>\` - Hapus dari whitelist
 • \`.list\` - Lihat whitelist PM
 • \`.info\` - Info sistem VPS
+• \`.speedtest\` - Menguji koneksi internet
 • \`.restart\` - Restart bot
 • \`.help\` - Menu ini`
 
@@ -314,6 +376,11 @@ async function startBot() {
                     } else {
                         await sendHuman(sock, jid, info)
                     }
+
+                } else if (tl === '.speedtest') {
+                    await sendHuman(sock, jid, '_Running speedtest..._ ⏳')
+                    const result = await getSpeedtestInfo()
+                    await sendHuman(sock, jid, result)
 
                 } else if (tl === '.restart') {
                     await sendHuman(sock, jid, '♻️ _Restarting bot..._ ')
